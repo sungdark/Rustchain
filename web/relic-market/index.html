@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent-a-Relic Market · wRTC Reservation System</title>
+  <style>
+    :root {
+      --bg: #020604;
+      --panel: #08130d;
+      --line: #183626;
+      --txt: #aff7c9;
+      --muted: #7fcc9f;
+      --accent: #38ff8d;
+      --warn: #ffe28a;
+      --dead: #9aa39d;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Courier New", monospace;
+      color: var(--txt);
+      background:
+        radial-gradient(circle at 50% -10%, rgba(56, 255, 141, 0.08), transparent 45%),
+        linear-gradient(#020604, #010302);
+      text-shadow: 0 0 8px rgba(56, 255, 141, 0.15);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.02) 0px,
+        rgba(255, 255, 255, 0.02) 1px,
+        transparent 2px,
+        transparent 4px
+      );
+      opacity: 0.15;
+      z-index: 9999;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+    
+    /* Header */
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 24px rgba(56, 255, 141, 0.08);
+    }
+    .head h1 { margin: 0; font-size: 20px; letter-spacing: 0.05em; }
+    .head-nav { display: flex; gap: 12px; }
+    .head-nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .head-nav a:hover { color: var(--accent); border-color: var(--accent); }
+    
+    /* Cards */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 0 20px rgba(56, 255, 141, 0.06);
+    }
+    .card h2 { margin: 0 0 14px 0; font-size: 16px; color: var(--accent); letter-spacing: 0.03em; }
+    .card h3 { margin: 0 0 10px 0; font-size: 14px; }
+    
+    /* Machine Grid */
+    .machine-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    .machine-card {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      transition: all 0.2s;
+    }
+    .machine-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(56, 255, 141, 0.12);
+    }
+    .machine-card.reserved { opacity: 0.6; border-color: var(--warn); }
+    .machine-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .machine-nickname { font-size: 15px; font-weight: bold; color: var(--accent); }
+    .machine-price { font-size: 13px; color: var(--warn); }
+    .machine-specs { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .machine-specs span { color: var(--txt); }
+    .machine-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; }
+    .machine-stats .stat { color: var(--muted); }
+    .machine-stats .stat span { color: var(--accent); font-weight: bold; }
+    
+    /* Badges */
+    .badge {
+      display: inline-block;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      color: var(--accent);
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: bold;
+      margin-right: 4px;
+    }
+    .badge.bottube {
+      background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+      color: #000;
+      border: none;
+    }
+    .badge.reserved { border-color: var(--warn); color: var(--warn); }
+    .badge.offline { border-color: var(--dead); color: var(--dead); }
+    
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn:hover { background: var(--accent); color: var(--bg); }
+    .btn.primary { background: var(--accent); color: var(--bg); }
+    .btn.primary:hover { background: #2de06a; }
+    .btn.danger { border-color: var(--err); color: var(--err); }
+    .btn.danger:hover { background: var(--err); color: #fff; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    
+    /* Forms */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .form-group input, .form-group select {
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--txt);
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    
+    /* Reservation Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+    .modal-content {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 480px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .modal-header h2 { margin: 0; font-size: 16px; color: var(--accent); }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 24px; cursor: pointer; line-height: 1; }
+    .modal-close:hover { color: var(--err); }
+    
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    .tab {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 14px;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--txt); }
+    .tab.active { color: var(--accent); background: rgba(56, 255, 141, 0.1); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    /* Leaderboard */
+    .leaderboard-table { width: 100%; border-collapse: collapse; }
+    .leaderboard-table th, .leaderboard-table td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12px; }
+    .leaderboard-table th { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
+    .leaderboard-table td .rank { color: var(--warn); font-weight: bold; }
+    .leaderboard-table td .revenue { color: var(--accent); }
+    
+    /* Receipt Display */
+    .receipt {
+      background: rgba(0,0,0,0.3);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 11px;
+      line-height: 1.8;
+    }
+    .receipt .receipt-header { text-align: center; color: var(--accent); font-size: 14px; margin-bottom: 12px; }
+    .receipt .field { display: flex; justify-content: space-between; }
+    .receipt .label { color: var(--muted); }
+    .receipt .value { color: var(--txt); font-weight: bold; }
+    .receipt .signature { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); word-break: break-all; }
+    
+    /* Status messages */
+    .status-msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
+    .status-msg.success { background: rgba(56, 255, 141, 0.15); border: 1px solid var(--accent); color: var(--accent); }
+    .status-msg.error { background: rgba(255, 107, 107, 0.15); border: 1px solid var(--err); color: var(--err); }
+    .status-msg.warn { background: rgba(255, 226, 138, 0.15); border: 1px solid var(--warn); color: var(--warn); }
+    
+    /* Loading */
+    .loading { text-align: center; color: var(--muted); padding: 20px; }
+    
+    /* Responsive */
+    @media (max-width: 700px) {
+      .form-row { grid-template-columns: 1fr; }
+      .head { flex-direction: column; gap: 10px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Header -->
+  <div class="head">
+    <h1>🎰 Rent-a-Relic Market</h1>
+    <nav class="head-nav">
+      <a href="#" onclick="showTab('browse')">Browse Machines</a>
+      <a href="#" onclick="showTab('my-reservations')">My Reservations</a>
+      <a href="#" onclick="showTab('leaderboard')">Leaderboard</a>
+      <a href="#" onclick="showTab('docs')">API Docs</a>
+    </nav>
+  </div>
+  
+  <!-- Status Message -->
+  <div id="status-msg"></div>
+  
+  <!-- Browse Tab -->
+  <div id="tab-browse" class="tab-content active">
+    <div class="card">
+      <h2>Available Machines</h2>
+      <div class="form-row" style="margin-bottom: 16px;">
+        <div class="form-group">
+          <label>Architecture</label>
+          <select id="filter-arch">
+            <option value="">All Architectures</option>
+            <option value="MOS 6502">MOS 6502 (Commodore, Apple II)</option>
+            <option value="Zilog Z80">Zilog Z80 (ZX Spectrum, TRS-80)</option>
+            <option value="Motorola 68000">Motorola 68000 (Mac, Amiga)</option>
+            <option value="Intel 80286">Intel 80286 (IBM PC/AT)</option>
+            <option value="PowerPC">PowerPC (IBM RS/6000)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Min Uptime Hours</label>
+          <input type="number" id="filter-uptime" placeholder="0" min="0">
+        </div>
+      </div>
+      <button class="btn primary" onclick="loadMachines()">Refresh</button>
+    </div>
+    
+    <div id="machine-grid" class="machine-grid">
+      <div class="loading">Loading machines...</div>
+    </div>
+  </div>
+  
+  <!-- My Reservations Tab -->
+  <div id="tab-my-reservations" class="tab-content">
+    <div class="card">
+      <h2>My Reservations</h2>
+      <div class="form-row" style="margin-bottom: 16px;">
+        <div class="form-group">
+          <label>Your Agent ID</label>
+          <input type="text" id="my-agent-id" placeholder="e.g., agent_your_name">
+        </div>
+      </div>
+      <button class="btn primary" onclick="loadMyReservations()">Load Reservations</button>
+    </div>
+    
+    <div id="my-reservations-list"></div>
+  </div>
+  
+  <!-- Leaderboard Tab -->
+  <div id="tab-leaderboard" class="tab-content">
+    <div class="card">
+      <h2>🏆 Most Popular Machines</h2>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">Top rented vintage machines in the RustChain network</p>
+    </div>
+    <div id="leaderboard-content">
+      <div class="loading">Loading leaderboard...</div>
+    </div>
+  </div>
+  
+  <!-- Docs Tab -->
+  <div id="tab-docs" class="tab-content">
+    <div class="card">
+      <h2>API Documentation</h2>
+      <div style="font-size: 13px; line-height: 1.8;">
+        <h3 style="color: var(--accent); margin-top: 16px;">Endpoints</h3>
+        
+        <div style="margin-bottom: 16px;">
+          <code style="color: var(--warn);">GET /relic/available</code>
+          <p style="color: var(--muted); margin: 4px 0 8px 0;">List available machines for reservation</p>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <code style="color: var(--warn);">POST /relic/reserve</code>
+          <p style="color: var(--muted); margin: 4px 0 8px 0;">Create a reservation</p>
+          <pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 11px;">{
+  "machine_passport_id": "MACHINE001",
+  "renter_agent_id": "your_agent_id",
+  "start_time": 1711540800.0,
+  "duration_hours": 1
+}</pre>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <code style="color: var(--warn);">GET /relic/receipt/{receipt_id}</code>
+          <p style="color: var(--muted); margin: 4px 0 8px 0;">Get a provenance receipt</p>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <code style="color: var(--warn);">GET /relic/leaderboard</code>
+          <p style="color: var(--muted); margin: 4px 0 8px 0;">Get rental leaderboard</p>
+        </div>
+        
+        <h3 style="color: var(--accent); margin-top: 20px;">MCP Tools</h3>
+        <p style="color: var(--muted);">AI agents can use these MCP tools for reservations.</p>
+        <ul style="color: var(--muted); line-height: 2;">
+          <li><code style="color: var(--txt);">relic_list_available</code> - List machines</li>
+          <li><code style="color: var(--txt);">relic_reserve</code> - Reserve time</li>
+          <li><code style="color: var(--txt);">relic_complete</code> - Complete & get receipt</li>
+          <li><code style="color: var(--txt);">relic_cancel</code> - Cancel reservation</li>
+          <li><code style="color: var(--txt);">relic_get_receipt</code> - Get receipt</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reserve Modal -->
+<div id="reserve-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Reserve Machine</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    
+    <div id="modal-machine-info"></div>
+    
+    <div style="margin-top: 16px;">
+      <div class="form-group">
+        <label>Your Agent ID</label>
+        <input type="text" id="reserve-agent-id" placeholder="agent_your_name">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Duration</label>
+          <select id="reserve-duration">
+            <option value="1">1 Hour</option>
+            <option value="4">4 Hours</option>
+            <option value="24">24 Hours</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Start Time</label>
+          <input type="datetime-local" id="reserve-start">
+        </div>
+      </div>
+      <div id="modal-cost" style="text-align: right; padding: 12px 0; font-size: 14px;">
+        <span style="color: var(--muted);">Cost:</span>
+        <span id="modal-cost-value" style="color: var(--warn); font-weight: bold;">0 RTC</span>
+      </div>
+      <button class="btn primary" style="width: 100%;" onclick="makeReservation()">Confirm Reservation</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '/api';
+let currentMachine = null;
+let machines = [];
+
+// Tab management
+function showTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+// Status messages
+function showStatus(msg, type = 'success') {
+  const el = document.getElementById('status-msg');
+  el.className = 'status-msg ' + type;
+  el.textContent = msg;
+  el.scrollIntoView({ behavior: 'smooth' });
+  setTimeout(() => el.textContent = '', 5000);
+}
+
+// Load machines
+async function loadMachines() {
+  const grid = document.getElementById('machine-grid');
+  grid.innerHTML = '<div class="loading">Loading machines...</div>';
+  
+  const arch = document.getElementById('filter-arch').value;
+  const minUptime = document.getElementById('filter-uptime').value || 0;
+  
+  try {
+    const url = `${API_BASE}/relic/available?arch=${arch}&min_uptime=${minUptime}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    machines = data.machines || [];
+    
+    if (machines.length === 0) {
+      grid.innerHTML = '<div class="card"><p style="color: var(--muted);">No machines available matching your criteria.</p></div>';
+      return;
+    }
+    
+    grid.innerHTML = machines.map(m => `
+      <div class="machine-card ${m.status !== 'available' ? 'reserved' : ''}">
+        <div class="machine-header">
+          <div>
+            <div class="machine-nickname">${m.nickname}</div>
+            ${m.photos && m.photos.length ? '<img src="' + m.photos[0] + '" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; margin-top: 6px;" onerror="this.style.display=\'none\'">' : ''}
+          </div>
+          <div>
+            <span class="badge">${m.status}</span>
+            <div class="machine-price">${m.rental_price_per_hour} RTC/hr</div>
+          </div>
+        </div>
+        <div class="machine-specs">
+          <div><span>${m.specs.arch}</span> · ${m.specs.model}</div>
+          <div>${m.specs.manufacturer} (${m.specs.manufacture_year})</div>
+          <div>${m.specs.cpu_clock_mhz} MHz · ${m.specs.ram_kb} KB RAM</div>
+        </div>
+        <div class="machine-stats">
+          <div class="stat">Uptime: <span>${m.uptime_hours.toLocaleString()}h</span></div>
+          <div class="stat">Attestations: <span>${m.attestation_count}</span></div>
+        </div>
+        ${m.status === 'available' ? `
+          <button class="btn" style="width: 100%; margin-top: 10px;" onclick="openReserveModal('${m.passport_id}')">Reserve</button>
+        ` : `
+          <button class="btn" style="width: 100%; margin-top: 10px;" disabled>Unavailable</button>
+        `}
+      </div>
+    `).join('');
+  } catch (err) {
+    grid.innerHTML = '<div class="card"><p style="color: var(--err);">Failed to load machines. Is the API server running?</p></div>';
+  }
+}
+
+// Load my reservations
+async function loadMyReservations() {
+  const agentId = document.getElementById('my-agent-id').value;
+  const list = document.getElementById('my-reservations-list');
+  
+  if (!agentId) {
+    showStatus('Please enter your Agent ID', 'error');
+    return;
+  }
+  
+  list.innerHTML = '<div class="loading">Loading reservations...</div>';
+  
+  try {
+    const res = await fetch(`${API_BASE}/relic/reservations?renter_agent_id=${encodeURIComponent(agentId)}`);
+    const data = await res.json();
+    const reservations = data.reservations || [];
+    
+    if (reservations.length === 0) {
+      list.innerHTML = '<div class="card"><p style="color: var(--muted);">No reservations found.</p></div>';
+      return;
+    }
+    
+    list.innerHTML = reservations.map(r => `
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <h3>Session: ${r.session_id}</h3>
+            <p style="font-size: 12px; color: var(--muted);">Machine: ${r.machine_passport_id}</p>
+          </div>
+          <span class="badge ${r.status === 'completed' ? '' : r.status === 'cancelled' ? 'reserved' : ''}">${r.status}</span>
+        </div>
+        <div style="margin-top: 10px; font-size: 12px;">
+          <span style="color: var(--muted);">Duration:</span> ${r.duration_hours}h ·
+          <span style="color: var(--muted);">Cost:</span> <span style="color: var(--warn);">${r.rtc_amount} RTC</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = '<div class="card"><p style="color: var(--err);">Failed to load reservations.</p></div>';
+  }
+}
+
+// Load leaderboard
+async function loadLeaderboard() {
+  const content = document.getElementById('leaderboard-content');
+  content.innerHTML = '<div class="loading">Loading...</div>';
+  
+  try {
+    const res = await fetch(`${API_BASE}/relic/leaderboard`);
+    const data = await res.json();
+    const board = data.leaderboard || [];
+    
+    if (board.length === 0) {
+      content.innerHTML = '<div class="card"><p style="color: var(--muted);">No data yet.</p></div>';
+      return;
+    }
+    
+    content.innerHTML = `
+      <div class="card">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Machine</th>
+              <th>Model</th>
+              <th>Rentals</th>
+              <th>Total Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${board.map(m => `
+              <tr>
+                <td><span class="rank">#${m.rank}</span></td>
+                <td>${m.nickname}</td>
+                <td style="color: var(--muted);">${m.model}</td>
+                <td>${m.rental_count}</td>
+                <td class="revenue">${m.total_revenue.toFixed(2)} RTC</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = '<div class="card"><p style="color: var(--err);">Failed to load leaderboard.</p></div>';
+  }
+}
+
+// Modal functions
+function openReserveModal(passportId) {
+  currentMachine = machines.find(m => m.passport_id === passportId);
+  if (!currentMachine) return;
+  
+  document.getElementById('modal-machine-info').innerHTML = `
+    <div class="card" style="margin-bottom: 0;">
+      <div style="font-size: 14px; color: var(--accent);">${currentMachine.nickname}</div>
+      <div style="font-size: 12px; color: var(--muted);">${currentMachine.specs.arch} · ${currentMachine.specs.model}</div>
+      <div style="font-size: 13px; margin-top: 8px;">
+        Price: <span style="color: var(--warn);">${currentMachine.rental_price_per_hour} RTC/hour</span>
+      </div>
+    </div>
+  `;
+  
+  // Set default start time to next hour
+  const now = new Date();
+  now.setHours(now.getHours() + 1, 0, 0, 0);
+  document.getElementById('reserve-start').value = now.toISOString().slice(0, 16);
+  
+  updateCost();
+  document.getElementById('reserve-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('reserve-modal').classList.remove('open');
+  currentMachine = null;
+}
+
+function updateCost() {
+  if (!currentMachine) return;
+  const duration = parseInt(document.getElementById('reserve-duration').value);
+  const cost = currentMachine.rental_price_per_hour * duration;
+  document.getElementById('modal-cost-value').textContent = cost.toFixed(2) + ' RTC';
+}
+
+document.getElementById('reserve-duration').addEventListener('change', updateCost);
+
+async function makeReservation() {
+  if (!currentMachine) return;
+  
+  const agentId = document.getElementById('reserve-agent-id').value;
+  const duration = parseInt(document.getElementById('reserve-duration').value);
+  const startInput = document.getElementById('reserve-start').value;
+  
+  if (!agentId) {
+    showStatus('Please enter your Agent ID', 'error');
+    return;
+  }
+  
+  const startTime = new Date(startInput).getTime() / 1000;
+  
+  try {
+    const res = await fetch(`${API_BASE}/relic/reserve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        machine_passport_id: currentMachine.passport_id,
+        renter_agent_id: agentId,
+        start_time: startTime,
+        duration_hours: duration,
+      })
+    });
+    
+    const data = await res.json();
+    
+    if (data.error) {
+      showStatus(data.error, 'error');
+      return;
+    }
+    
+    const resv = data.reservation;
+    showStatus(`Reservation confirmed! ID: ${resv.reservation_id}`, 'success');
+    closeModal();
+    
+    // Show receipt info
+    if (resv.ssh_credentials) {
+      console.log('SSH Credentials:', resv.ssh_credentials);
+    }
+    
+    loadMachines();
+  } catch (err) {
+    showStatus('Failed to create reservation', 'error');
+  }
+}
+
+// Close modal on outside click
+document.getElementById('reserve-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  loadMachines();
+  loadLeaderboard();
+});
+</script>
+</body>
+</html>
